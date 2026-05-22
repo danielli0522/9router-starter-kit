@@ -344,7 +344,7 @@ info "Combo 策略已设为 fallback"
 # ============================================
 step "Step 8: 获取 API Key"
 
-ROUTER_KEY=$(curl -sf "$BASE_URL/api/keys" -b "$COOKIE_FILE" | jq -r '.[0].key' 2>/dev/null)
+ROUTER_KEY=$(curl -sf "$BASE_URL/api/keys" -b "$COOKIE_FILE" | jq -r '.keys[0].key' 2>/dev/null)
 
 if [ -z "$ROUTER_KEY" ] || [ "$ROUTER_KEY" = "null" ]; then
   ROUTER_KEY=$(curl -sf -X POST "$BASE_URL/api/keys" \

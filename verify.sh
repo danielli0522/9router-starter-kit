@@ -64,7 +64,7 @@ echo "阶段 2: 9Router 配置检查"
 
 PROVIDERS=$(curl -sf "$BASE_URL/api/providers" -b "$COOKIE_FILE" 2>/dev/null)
 if [ $? -eq 0 ] && [ -n "$PROVIDERS" ]; then
-  PROVIDER_COUNT=$(echo "$PROVIDERS" | jq 'length' 2>/dev/null)
+  PROVIDER_COUNT=$(echo "$PROVIDERS" | jq '.connections | length' 2>/dev/null)
   if [ "$PROVIDER_COUNT" -gt 0 ] 2>/dev/null; then
     check_pass "Provider: $PROVIDER_COUNT 个"
   else
@@ -88,7 +88,7 @@ fi
 
 COMBOS=$(curl -sf "$BASE_URL/api/combos" -b "$COOKIE_FILE" 2>/dev/null)
 if [ $? -eq 0 ] && [ -n "$COMBOS" ]; then
-  COMBO_COUNT=$(echo "$COMBOS" | jq 'length' 2>/dev/null)
+  COMBO_COUNT=$(echo "$COMBOS" | jq '.combos | length' 2>/dev/null)
   if [ "$COMBO_COUNT" -gt 0 ] 2>/dev/null; then
     check_pass "Combo: $COMBO_COUNT 个"
   else
@@ -149,7 +149,7 @@ echo ""
 echo "阶段 4: 模型路由测试"
 
 # 获取 API Key
-ROUTER_KEY=$(curl -sf "$BASE_URL/api/keys" -b "$COOKIE_FILE" | jq -r '.[0].key' 2>/dev/null)
+ROUTER_KEY=$(curl -sf "$BASE_URL/api/keys" -b "$COOKIE_FILE" | jq -r '.keys[0].key' 2>/dev/null)
 
 if [ -n "$ROUTER_KEY" ] && [ "$ROUTER_KEY" != "null" ]; then
   # 测试 haiku 路由
@@ -157,9 +157,9 @@ if [ -n "$ROUTER_KEY" ] && [ "$ROUTER_KEY" != "null" ]; then
     -H "x-api-key: $ROUTER_KEY" \
     -H "content-type: application/json" \
     -H "anthropic-version: 2023-06-01" \
-    -d '{"model":"claude-haiku-4-5","messages":[{"role":"user","content":"say ok"}],"max_tokens":10}' 2>&1)
+    -d '{"model":"claude-haiku-4-5","messages":[{"role":"user","content":"say ok"}],"max_tokens":10}' 2>/dev/null)
 
-  if [ $? -eq 0 ] && echo "$HAIKU_RESP" | jq -e '.content' &>/dev/null; then
+  if [ $? -eq 0 ] && echo "$HAIKU_RESP" | sed 's/data: \[DONE\]//' | jq -e '.content' &>/dev/null; then
     check_pass "haiku 路由正常"
   else
     check_fail "haiku 路由失败（检查 Dashboard 日志）"
@@ -170,9 +170,9 @@ if [ -n "$ROUTER_KEY" ] && [ "$ROUTER_KEY" != "null" ]; then
     -H "x-api-key: $ROUTER_KEY" \
     -H "content-type: application/json" \
     -H "anthropic-version: 2023-06-01" \
-    -d '{"model":"claude-opus-4-7","messages":[{"role":"user","content":"say ok"}],"max_tokens":10}' 2>&1)
+    -d '{"model":"claude-opus-4-7","messages":[{"role":"user","content":"say ok"}],"max_tokens":10}' 2>/dev/null)
 
-  if [ $? -eq 0 ] && echo "$OPUS_RESP" | jq -e '.content' &>/dev/null; then
+  if [ $? -eq 0 ] && echo "$OPUS_RESP" | sed 's/data: \[DONE\]//' | jq -e '.content' &>/dev/null; then
     check_pass "opus 路由正常"
   else
     check_warn "opus 路由失败（可能未 OAuth 登录或 quota 不足）"
