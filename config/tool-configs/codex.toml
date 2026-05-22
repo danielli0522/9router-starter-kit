@@ -1,0 +1,4 @@
+# 添加到 ~/.zshrc 或 ~/.bashrc:
+export OPENAI_BASE_URL={{BASE_URL}}
+export OPENAI_API_KEY={{API_KEY}}
+# Codex 使用 OpenAI 格式，9Router 的 /v1/chat/completions 端点兼容

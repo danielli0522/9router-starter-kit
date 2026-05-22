@@ -1,0 +1,11 @@
+{
+  "models": {
+    "providers": {
+      "9router": {
+        "baseUrl": "{{BASE_URL}}",
+        "apiKey": "{{API_KEY}}",
+        "api": "anthropic-messages"
+      }
+    }
+  }
+}

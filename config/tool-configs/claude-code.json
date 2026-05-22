@@ -1,0 +1,7 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "{{BASE_URL}}",
+    "ANTHROPIC_AUTH_TOKEN": "{{API_KEY}}"
+  },
+  "model": "{{DEFAULT_MODEL}}"
+}
