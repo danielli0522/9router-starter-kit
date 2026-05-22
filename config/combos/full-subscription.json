@@ -1,0 +1,17 @@
+{
+  "name": "smart-routing",
+  "description": "Claude Max 订阅 + GLM + DeepSeek 全链路",
+  "models": [
+    "cc/claude-opus-4-7",
+    "cc/claude-sonnet-4-6",
+    "glm/glm-5.1",
+    "ds/deepseek-chat"
+  ],
+  "strategy": "fallback",
+  "aliasOverrides": {
+    "claude-haiku-4-5": "glm/glm-5.1",
+    "claude-haiku-4-5-20251001": "glm/glm-5.1",
+    "claude-opus-4-7": "cc/claude-opus-4-7",
+    "claude-sonnet-4-6": "cc/claude-sonnet-4-6"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "smart-routing",
+  "description": "纯免费模型（Qwen + Kiro）",
+  "models": [
+    "qw/qwen-plus",
+    "kr/kiro"
+  ],
+  "strategy": "fallback",
+  "aliasOverrides": {}
+}

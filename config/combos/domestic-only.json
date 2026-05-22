@@ -1,0 +1,14 @@
+{
+  "name": "smart-routing",
+  "description": "纯国产模型（GLM + DeepSeek + Qwen）",
+  "models": [
+    "glm/glm-5.1",
+    "ds/deepseek-chat",
+    "qw/qwen-plus"
+  ],
+  "strategy": "fallback",
+  "aliasOverrides": {
+    "claude-haiku-4-5": "glm/glm-5.1",
+    "claude-haiku-4-5-20251001": "glm/glm-5.1"
+  }
+}
