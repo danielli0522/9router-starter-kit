@@ -159,6 +159,39 @@ fi
 info "API Key 收集完成"
 
 # ============================================
+# Step 3.5: 登录 9Router Dashboard
+# ============================================
+step "Step 3.5: Dashboard 登录"
+
+COOKIE_FILE="$OUTPUT_DIR/.9router-session"
+
+# Try existing session first
+if [ -f "$COOKIE_FILE" ]; then
+  if curl -sf "$BASE_URL/api/providers" -b "$COOKIE_FILE" > /dev/null 2>&1; then
+    info "使用已有 Dashboard 会话"
+  else
+    rm -f "$COOKIE_FILE"
+  fi
+fi
+
+if [ ! -f "$COOKIE_FILE" ]; then
+  echo "9Router Dashboard 需要登录（密码是你首次打开 Dashboard 时设置的）"
+  read -sp "输入 Dashboard 密码: " dashboard_pwd
+  echo ""
+
+  LOGIN_RESP=$(curl -sf -X POST "$BASE_URL/api/auth/login" \
+    -H "Content-Type: application/json" \
+    -d "{\"password\":\"$dashboard_pwd\"}" \
+    -c "$COOKIE_FILE" 2>&1)
+
+  if [ $? -ne 0 ] || echo "$LOGIN_RESP" | jq -e '.error' > /dev/null 2>&1; then
+    rm -f "$COOKIE_FILE"
+    fail "Dashboard 登录失败: $(echo "$LOGIN_RESP" | jq -r '.error // "未知错误"')"
+  fi
+  info "Dashboard 登录成功"
+fi
+
+# ============================================
 # Step 4: 写入 Provider 到 9Router
 # ============================================
 step "Step 4: 写入 Provider"
@@ -173,6 +206,7 @@ write_provider() {
 
   local result
   result=$(curl -sf -X POST "$BASE_URL/api/providers" \
+    -b "$COOKIE_FILE" \
     -H "Content-Type: application/json" \
     -d "$payload" 2>&1)
   if [ $? -eq 0 ]; then
@@ -248,6 +282,7 @@ fi
 ALIAS_JSON+="}"
 
 curl -sf -X POST "$BASE_URL/api/models/alias" \
+  -b "$COOKIE_FILE" \
   -H "Content-Type: application/json" \
   -d "{\"aliases\":$ALIAS_JSON}" > /dev/null
 
@@ -286,6 +321,7 @@ fi
 COMBO_MODELS="[$(IFS=,; echo "${COMBO_ENTRIES[*]}")]"
 
 curl -sf -X POST "$BASE_URL/api/combos" \
+  -b "$COOKIE_FILE" \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"smart-routing\",\"models\":$COMBO_MODELS}" > /dev/null
 
@@ -297,6 +333,7 @@ info "Combo 'smart-routing' 写入完成 (${#COMBO_ENTRIES[@]} 个模型)"
 step "Step 7: 设置策略"
 
 curl -sf -X PATCH "$BASE_URL/api/settings" \
+  -b "$COOKIE_FILE" \
   -H "Content-Type: application/json" \
   -d '{"comboStrategy":"fallback"}' > /dev/null
 
@@ -307,10 +344,11 @@ info "Combo 策略已设为 fallback"
 # ============================================
 step "Step 8: 获取 API Key"
 
-ROUTER_KEY=$(curl -sf "$BASE_URL/api/keys" | jq -r '.[0].key' 2>/dev/null)
+ROUTER_KEY=$(curl -sf "$BASE_URL/api/keys" -b "$COOKIE_FILE" | jq -r '.[0].key' 2>/dev/null)
 
 if [ -z "$ROUTER_KEY" ] || [ "$ROUTER_KEY" = "null" ]; then
   ROUTER_KEY=$(curl -sf -X POST "$BASE_URL/api/keys" \
+    -b "$COOKIE_FILE" \
     -H "Content-Type: application/json" \
     -d '{"name":"starter-kit"}' | jq -r '.key' 2>/dev/null)
   info "已创建新 API Key"
@@ -429,7 +467,7 @@ echo ""
 # 先运行 verify.sh 验证 9Router 自身配置
 echo "正在验证 9Router 配置..."
 VERIFY_RESULT=0
-"$SCRIPT_DIR/verify.sh" || VERIFY_RESULT=$?
+COOKIE_FILE="$COOKIE_FILE" "$SCRIPT_DIR/verify.sh" || VERIFY_RESULT=$?
 
 if [ "$VERIFY_RESULT" -ne 0 ]; then
   echo ""

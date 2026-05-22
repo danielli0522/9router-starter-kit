@@ -14,8 +14,26 @@ check_fail() { echo -e "  ${RED}[✗]${NC} $1"; ((FAIL_COUNT++)); FAILS+=("$1");
 check_warn() { echo -e "  ${YELLOW}[!]${NC} $1"; ((WARN_COUNT++)); WARNS+=("$1"); }
 
 BASE_URL="http://localhost:20128"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FAILS=()
 WARNS=()
+
+COOKIE_FILE="${COOKIE_FILE:-$SCRIPT_DIR/output/.9router-session}"
+
+# Try login if no valid cookie
+login_if_needed() {
+  if [ -f "$COOKIE_FILE" ] && curl -sf "$BASE_URL/api/providers" -b "$COOKIE_FILE" > /dev/null 2>&1; then
+    return 0
+  fi
+
+  # verify.sh is non-interactive — inform user and fail
+  if ! curl -sf "$BASE_URL/api/providers" -b "$COOKIE_FILE" > /dev/null 2>&1; then
+    echo "  ⚠ Dashboard 需要登录。请先运行: ./configure.sh"
+    return 1
+  fi
+}
+
+login_if_needed || true
 
 echo "9Router 验证报告"
 echo "================"
@@ -44,7 +62,7 @@ fi
 echo ""
 echo "阶段 2: 9Router 配置检查"
 
-PROVIDERS=$(curl -sf "$BASE_URL/api/providers" 2>/dev/null)
+PROVIDERS=$(curl -sf "$BASE_URL/api/providers" -b "$COOKIE_FILE" 2>/dev/null)
 if [ $? -eq 0 ] && [ -n "$PROVIDERS" ]; then
   PROVIDER_COUNT=$(echo "$PROVIDERS" | jq 'length' 2>/dev/null)
   if [ "$PROVIDER_COUNT" -gt 0 ] 2>/dev/null; then
@@ -56,7 +74,7 @@ else
   check_fail "Provider: 无法读取 (9Router API 异常)"
 fi
 
-ALIASES=$(curl -sf "$BASE_URL/api/models/alias" 2>/dev/null)
+ALIASES=$(curl -sf "$BASE_URL/api/models/alias" -b "$COOKIE_FILE" 2>/dev/null)
 if [ $? -eq 0 ] && [ -n "$ALIASES" ]; then
   ALIAS_COUNT=$(echo "$ALIASES" | jq 'length' 2>/dev/null)
   if [ "${ALIAS_COUNT:-0}" -ge 2 ]; then
@@ -68,7 +86,7 @@ else
   check_warn "Alias: 无法读取"
 fi
 
-COMBOS=$(curl -sf "$BASE_URL/api/combos" 2>/dev/null)
+COMBOS=$(curl -sf "$BASE_URL/api/combos" -b "$COOKIE_FILE" 2>/dev/null)
 if [ $? -eq 0 ] && [ -n "$COMBOS" ]; then
   COMBO_COUNT=$(echo "$COMBOS" | jq 'length' 2>/dev/null)
   if [ "$COMBO_COUNT" -gt 0 ] 2>/dev/null; then
@@ -80,7 +98,7 @@ else
   check_fail "Combo: 无法读取"
 fi
 
-SETTINGS=$(curl -sf "$BASE_URL/api/settings" 2>/dev/null)
+SETTINGS=$(curl -sf "$BASE_URL/api/settings" -b "$COOKIE_FILE" 2>/dev/null)
 if [ $? -eq 0 ]; then
   STRATEGY=$(echo "$SETTINGS" | jq -r '.comboStrategy // "unknown"' 2>/dev/null)
   if [ "$STRATEGY" = "fallback" ]; then
@@ -131,7 +149,7 @@ echo ""
 echo "阶段 4: 模型路由测试"
 
 # 获取 API Key
-ROUTER_KEY=$(curl -sf "$BASE_URL/api/keys" | jq -r '.[0].key' 2>/dev/null)
+ROUTER_KEY=$(curl -sf "$BASE_URL/api/keys" -b "$COOKIE_FILE" | jq -r '.[0].key' 2>/dev/null)
 
 if [ -n "$ROUTER_KEY" ] && [ "$ROUTER_KEY" != "null" ]; then
   # 测试 haiku 路由
