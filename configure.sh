@@ -11,6 +11,70 @@ warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 fail()  { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 step()  { echo -e "\n${CYAN}=== $1 ===${NC}"; }
 
+# 多选复选框: multiselect RESULT_ARRAY "选项1" "选项2" ...
+# ↑↓/jk 移动, 空格勾选, 回车确认
+multiselect() {
+  local _result_var=$1; shift
+  local _options=("$@")
+  local _count=${#_options[@]}
+  local _cursor=0
+  local _selected=()
+  for ((i=0; i<_count; i++)); do _selected+=(""); done
+
+  # 隐藏光标
+  tput civis 2>/dev/null
+  # 保存光标位置
+  tput sc 2>/dev/null
+
+  _draw_menu() {
+    tput rc 2>/dev/null
+    for ((i=0; i<_count; i++)); do
+      tput el 2>/dev/null
+      if [ $i -eq $_cursor ]; then
+        printf "  ${CYAN}❯${NC} [%s] %s\n" "${_selected[$i]:- }" "${_options[$i]}"
+      else
+        printf "    [%s] %s\n" "${_selected[$i]:- }" "${_options[$i]}"
+      fi
+    done
+  }
+
+  _draw_menu
+
+  while IFS= read -rsn1 _key; do
+    case "$_key" in
+      $'\x1b')
+        read -rsn2 -t 0.1 _seq
+        case "$_seq" in
+          '[A') ((_cursor > 0)) && ((_cursor--)) ;;  # ↑
+          '[B') ((_cursor < _count-1)) && ((_cursor++)) ;;  # ↓
+        esac
+        ;;
+      'j') ((_cursor < _count-1)) && ((_cursor++)) ;;
+      'k') ((_cursor > 0)) && ((_cursor--)) ;;
+      ' ')
+        if [ "${_selected[$_cursor]}" = "x" ]; then
+          _selected[$_cursor]=""
+        else
+          _selected[$_cursor]="x"
+        fi
+        ;;
+      '') break ;;  # 回车确认
+    esac
+    _draw_menu
+  done
+
+  # 恢复光标
+  tput cnorm 2>/dev/null
+
+  # 收集结果
+  eval "$_result_var=()"
+  for ((i=0; i<_count; i++)); do
+    if [ "${_selected[$i]}" = "x" ]; then
+      eval "$_result_var+=(\"\$i\")"
+    fi
+  done
+}
+
 BASE_URL="http://localhost:20128"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUTPUT_DIR="$SCRIPT_DIR/output"
@@ -41,27 +105,20 @@ mkdir -p "$OUTPUT_DIR"
 # ============================================
 step "Step 1: 选择 AI 编码工具"
 
-echo "你用哪些 AI 编码工具？（输入编号，空格分隔，回车确认）"
-echo "  1) Claude Code"
-echo "  2) Cursor"
-echo "  3) Cline"
-echo "  4) Codex"
-echo "  5) Gemini CLI"
-echo "  6) OpenClaw"
-echo ""
-read -p "选择 [1-6]: " tool_input
+echo "用哪些工具？（↑↓ 移动，空格勾选，回车确认）"
+TOOL_INDICES=()
+multiselect TOOL_INDICES \
+  "Claude Code" \
+  "Cursor" \
+  "Cline" \
+  "Codex" \
+  "Gemini CLI" \
+  "OpenClaw"
 
 SELECTED_TOOLS=()
-for n in $tool_input; do
-  case $n in
-    1) SELECTED_TOOLS+=("claude-code") ;;
-    2) SELECTED_TOOLS+=("cursor") ;;
-    3) SELECTED_TOOLS+=("cline") ;;
-    4) SELECTED_TOOLS+=("codex") ;;
-    5) SELECTED_TOOLS+=("gemini-cli") ;;
-    6) SELECTED_TOOLS+=("openclaw") ;;
-    *) warn "忽略无效选择: $n" ;;
-  esac
+TOOL_NAMES=("claude-code" "cursor" "cline" "codex" "gemini-cli" "openclaw")
+for idx in "${TOOL_INDICES[@]}"; do
+  SELECTED_TOOLS+=("${TOOL_NAMES[$idx]}")
 done
 
 if [ ${#SELECTED_TOOLS[@]} -eq 0 ]; then
@@ -75,15 +132,15 @@ info "已选工具: ${SELECTED_TOOLS[*]}"
 # ============================================
 step "Step 2: 选择模型服务"
 
-echo "你有哪些模型服务？（输入编号，空格分隔，回车确认）"
-echo "  1) Claude Max 订阅 (OAuth 登录)"
-echo "  2) Claude API Key"
-echo "  3) 智谱 GLM (API Key)"
-echo "  4) DeepSeek (API Key)"
-echo "  5) 通义千问 Qwen (免费 API)"
-echo "  6) 其他 OpenAI 兼容模型 (自定义)"
-echo ""
-read -p "选择 [1-6]: " model_input
+echo "有哪些模型服务？（↑↓ 移动，空格勾选，回车确认）"
+MODEL_INDICES=()
+multiselect MODEL_INDICES \
+  "Claude Max 订阅 (OAuth 登录)" \
+  "Claude API Key" \
+  "智谱 GLM (API Key)" \
+  "DeepSeek (API Key)" \
+  "通义千问 Qwen (免费 API)" \
+  "其他 OpenAI 兼容模型 (自定义)"
 
 HAS_CLAUDE_OAUTH=0
 HAS_CLAUDE_APIKEY=0
@@ -95,15 +152,14 @@ CUSTOM_BASE_URL=""
 CUSTOM_API_KEY=""
 CUSTOM_MODEL=""
 
-for n in $model_input; do
-  case $n in
-    1) HAS_CLAUDE_OAUTH=1 ;;
-    2) HAS_CLAUDE_APIKEY=1 ;;
-    3) HAS_GLM=1 ;;
-    4) HAS_DEEPSEEK=1 ;;
-    5) HAS_QWEN=1 ;;
-    6) HAS_CUSTOM=1 ;;
-    *) warn "忽略无效选择: $n" ;;
+for idx in "${MODEL_INDICES[@]}"; do
+  case $idx in
+    0) HAS_CLAUDE_OAUTH=1 ;;
+    1) HAS_CLAUDE_APIKEY=1 ;;
+    2) HAS_GLM=1 ;;
+    3) HAS_DEEPSEEK=1 ;;
+    4) HAS_QWEN=1 ;;
+    5) HAS_CUSTOM=1 ;;
   esac
 done
 
