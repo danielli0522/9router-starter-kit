@@ -11,66 +11,25 @@ warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 fail()  { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 step()  { echo -e "\n${CYAN}=== $1 ===${NC}"; }
 
-# 多选复选框: multiselect RESULT_ARRAY "选项1" "选项2" ...
-# ↑↓/jk 移动, 空格勾选, 回车确认
+# 多选: multiselect RESULT_ARRAY "选项1" "选项2" ...
+# 输入序号（空格分隔），如: 1 3 5
 multiselect() {
   local _result_var=$1; shift
   local _options=("$@")
   local _count=${#_options[@]}
-  local _cursor=0
-  local _selected=()
-  for ((i=0; i<_count; i++)); do _selected+=(""); done
 
-  # 隐藏光标
-  tput civis 2>/dev/null
-  # 保存光标位置
-  tput sc 2>/dev/null
-
-  _draw_menu() {
-    tput rc 2>/dev/null
-    for ((i=0; i<_count; i++)); do
-      tput el 2>/dev/null
-      if [ $i -eq $_cursor ]; then
-        printf "  ${CYAN}❯${NC} [%s] %s\n" "${_selected[$i]:- }" "${_options[$i]}"
-      else
-        printf "    [%s] %s\n" "${_selected[$i]:- }" "${_options[$i]}"
-      fi
-    done
-  }
-
-  _draw_menu
-
-  while IFS= read -rsn1 _key; do
-    case "$_key" in
-      $'\x1b')
-        read -rsn2 -t 0.1 _seq
-        case "$_seq" in
-          '[A') ((_cursor > 0)) && ((_cursor--)) ;;  # ↑
-          '[B') ((_cursor < _count-1)) && ((_cursor++)) ;;  # ↓
-        esac
-        ;;
-      'j') ((_cursor < _count-1)) && ((_cursor++)) ;;
-      'k') ((_cursor > 0)) && ((_cursor--)) ;;
-      ' ')
-        if [ "${_selected[$_cursor]}" = "x" ]; then
-          _selected[$_cursor]=""
-        else
-          _selected[$_cursor]="x"
-        fi
-        ;;
-      '') break ;;  # 回车确认
-    esac
-    _draw_menu
+  for ((i=0; i<_count; i++)); do
+    echo "  $((i+1))) ${_options[$i]}"
   done
 
-  # 恢复光标
-  tput cnorm 2>/dev/null
+  local _input=""
+  read -p "输入序号（空格分隔）: " _input
 
-  # 收集结果
   eval "$_result_var=()"
-  for ((i=0; i<_count; i++)); do
-    if [ "${_selected[$i]}" = "x" ]; then
-      eval "$_result_var+=(\"\$i\")"
+  for num in $_input; do
+    local idx=$((num - 1))
+    if [ "$idx" -ge 0 ] 2>/dev/null && [ "$idx" -lt "$_count" ] 2>/dev/null; then
+      eval "$_result_var+=(\"\$idx\")"
     fi
   done
 }
@@ -105,7 +64,7 @@ mkdir -p "$OUTPUT_DIR"
 # ============================================
 step "Step 1: 选择 AI 编码工具"
 
-echo "用哪些工具？（↑↓ 移动，空格勾选，回车确认）"
+echo "你用哪些工具？"
 TOOL_INDICES=()
 multiselect TOOL_INDICES \
   "Claude Code" \
@@ -132,7 +91,7 @@ info "已选工具: ${SELECTED_TOOLS[*]}"
 # ============================================
 step "Step 2: 选择模型服务"
 
-echo "有哪些模型服务？（↑↓ 移动，空格勾选，回车确认）"
+echo "你有哪些模型服务？"
 MODEL_INDICES=()
 multiselect MODEL_INDICES \
   "Claude Max 订阅 (OAuth 登录)" \
